@@ -2,13 +2,19 @@
 
 import java.io.File
 
-val file = File("/Users/m.bonnin/Downloads/HistoriqueOperations_015188669841_du_01_01_2019_au_28_12_2019.csv")
+val file = File(args[0])
 
 var total = 0
 var found = 0
 
-file.readLines().drop(1).map {
+val lines = file.readLines()
+val numberOfColumns = 8
+
+lines.drop(1).map {
     val r = it.split(";")
+
+    // Pad all the columns to the same sizes
+    val columns = (r + List(numberOfColumns - r.size) {""}).toMutableList()
 
     val libelle = r[2]
 
@@ -81,7 +87,8 @@ file.readLines().drop(1).map {
         }
         libelle.contains("SETTE") -> {
             // Pizza rue brochant
-            category = "Sortie"
+            category = "Sorties"
+            subCategory = "Resto"
         }
         libelle.contains("MABADIS") -> {
             category = "Courses"
@@ -97,15 +104,46 @@ file.readLines().drop(1).map {
             category = "Courses"
             subCategory = "Cafe"
         }
+        libelle.contains("VIR BONNIN") -> {
+            category = "Virement"
+        }
+        libelle.startsWith("VIR ") -> {
+            category = "Virement"
+        }
+        libelle.toLowerCase().contains("pharmacie") -> {
+            category = "Pharmacie"
+        }
+        libelle.contains("KH PRIMEUR") -> {
+            category = "Courses"
+            subCategory = "Primeur Chinois"
+        }
+        libelle.contains("NICOLAS") -> {
+            category = "Courses"
+            subCategory = "Alcool"
+        }
+
     }
 
     total += 1
     if (category != null) {
         found += 1
     }
-    (r + listOf(category?:"", subCategory?:"")).joinToString(";")
+
+    // csv ignores trailing null values
+    category?.let {
+        columns.set(5, category)
+    }
+    subCategory?.let {
+        columns.set(6, subCategory)
+    }
+    columns.toList()
+}.let {
+    listOf(listOf("date", "date", "libelle", "debit", "credit", "category", "subcategory", "comment")) + it
+}.map {
+    it.joinToString(";")
 }.joinToString(separator = "\n", postfix = "\n").also {
     File("output.csv").writeText(it)
 }
 
 println("Found: $found/$total (${found.toDouble()/total}%")
+println("output.csv written.")
