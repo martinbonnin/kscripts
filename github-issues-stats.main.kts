@@ -122,12 +122,12 @@ issues.forEach { issue ->
             comment.getObject("author").getObject("login") == "martinbonnin"
         }?.getString("publishedAt")
 
-        if (commentPublishedAt != null && issue.getObject("author").getObject("login") == "martinbonnin") {
+        if (commentPublishedAt != null && issue.getObject("author").getObject("login") != "martinbonnin") {
             val responseTime = (commentPublishedAt.toDate().time - publishedAt) / 1000 / 3600
             println(
                 String.format(
                     "%4d, %8d, %s",
-                    issue.getObject("number"),
+                    (issue.getObject("number") as Number).toInt(),
                     responseTime,
                     issue.getObject("title")
                 )
@@ -148,6 +148,7 @@ println("$closed issues closed")
 @OptIn(ExperimentalTime::class)
 val avg = responseTimes.average()
 println("${responseTimes.size} issues answered. Average response time: $avg")
+println("${responseTimes.filter { it <= 1 }.size} issues answered in less than 2 hours")
 
 fun String.toDate() = dateFormat.parse(
     this
