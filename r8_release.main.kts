@@ -54,7 +54,7 @@ object : CliktCommand() {
 
   private fun makeRelease(tmpDir: File, releaseFile: File, version: String, local: Boolean) {
     shell {
-      //"tools/create_maven_release.py --out ${releaseFile.absolutePath}"().throwOnError()
+      "tools/create_maven_release.py --out ${releaseFile.absolutePath}"().throwOnError()
       "unzip -d ${tmpDir.absolutePath} ${releaseFile.absolutePath}"().throwOnError()
     }
 
