@@ -15,8 +15,9 @@ class MainCommand: CliktCommand() {
   val repositoryId by option().required()
 
   override fun run() {
-    val jcenter = getFile("https://jcenter.bintray.com/com/apollographql/apollo/apollo-api/$version/apollo-api-$version.jar")
-    val maven = getFile("https://oss.sonatype.org/content/repositories/comapollographql-$repositoryId/com/apollographql/apollo/apollo-api/$version/apollo-api-$version.jar")
+    val artifact = "apollo-runtime"
+    val jcenter = getFile("https://jcenter.bintray.com/com/apollographql/apollo/$artifact/$version/$artifact-$version.jar")
+    val maven = getFile("https://oss.sonatype.org/content/repositories/comapollographql-$repositoryId/com/apollographql/apollo/$artifact/$version/$artifact-$version.jar")
 
     check(jcenter.size == maven.size) {
       "Different sizes: ${jcenter.size} != ${maven.size}"
