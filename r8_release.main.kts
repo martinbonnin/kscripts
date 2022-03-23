@@ -58,15 +58,19 @@ object : CliktCommand() {
       "unzip -d ${tmpDir.absolutePath} ${releaseFile.absolutePath}"().throwOnError()
     }
 
+    val versionToOverWrite = "3.1.9-dev"
     tmpDir.walk(direction = FileWalkDirection.BOTTOM_UP).forEach {
-      if (it.name.contains("main")) {
-        val newName = it.name.replace("main", version)
+      if (it.name.contains(versionToOverWrite)) {
+        val newName = it.name.replace(versionToOverWrite, version)
         it.renameTo(File(it.parentFile, newName))
       }
     }
     tmpDir.walk(direction = FileWalkDirection.BOTTOM_UP).forEach {
       if (it.extension == "pom") {
-        it.writeText(it.readText().replace("main", version))
+        it.writeText(it.readText()
+            .replace(versionToOverWrite, version)
+            .replace("<groupId>com.android.tools</groupId>", "<groupId>net.mbonnin.r8</groupId>")
+        )
       }
     }
     File(tmpDir, "net/mbonnin/r8").mkdirs()
@@ -88,12 +92,13 @@ object : CliktCommand() {
       val privateKeyPassword = System.getenv("GPG_PRIVATE_KEY_PASSWORD")
           ?: throw IllegalArgumentException("Please specify GPG_PRIVATE_KEY_PASSWORD")
 
-      File(sourcesJar.absolutePath + ".md5").writeText(sourcesJar.source().buffer().md5())
-      File(javadocJar.absolutePath + ".md5").writeText(javadocJar.source().buffer().md5())
+      val (artifacs, other) = File(tmpDir, "net/mbonnin/r8/r8/$version/").listFiles()!!.filter {
+        it.isFile
+      }.partition { it.extension in listOf("jar", "pom") }
 
-      File(tmpDir, "net/mbonnin/r8/r8/$version/").listFiles()!!.filter {
-        it.isFile && it.extension in listOf("jar", "pom")
-      }.forEach { file ->
+      other.forEach { it.delete() }
+      artifacs.forEach { file ->
+        File(file.absolutePath + ".md5").writeText(file.source().buffer().md5())
         File(file.absolutePath + ".asc").writeText(file.source().buffer().sign(privateKey, privateKeyPassword))
       }
 
@@ -112,14 +117,18 @@ object : CliktCommand() {
           }
 
       runBlocking {
-        print("creating staging repo...")
-        nexusClient.upload(
+        println("creating staging repo...")
+        val repositoryId = nexusClient.upload(
             directory = tmpDir,
             profileId = System.getenv("NET_MBONNIN_PROFILE_ID") ?: error("Specify NET_MBONNIN_PROFILE_ID or --local to publish locally"),
             comment = "R8 mirror $version"
         ) { cur, total, _ ->
           print("\ruploading $cur / $total")
         }
+
+        println("")
+        println("Closing...")
+        nexusClient.closeRepositories(listOf(repositoryId))
       }
     }
     println("done")
