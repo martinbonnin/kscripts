@@ -23,7 +23,7 @@ val (owner, repoName) = args.getOrNull(0)?.split("/")?.let { it[0] to it[1] }
     ?: throw IllegalArgumentException("usage: github-issues-stats.main.kts [owner/repoName]")
 
 val okHttpClient = OkHttpClient.Builder().addInterceptor(HttpLoggingInterceptor().apply {
-    //level = HttpLoggingInterceptor.Level.BODY
+  //level = HttpLoggingInterceptor.Level.BODY
 }).build()
 
 val issuesFile = File("issues.json")
@@ -31,15 +31,15 @@ val issuesFile = File("issues.json")
 val adapter = Moshi.Builder().build().adapter(Any::class.java)!!
 
 if (issuesFile.exists()) {
-    println("reusing ${issuesFile.path}")
+  println("reusing ${issuesFile.path}")
 } else {
-    var i = 0
-    var after: String? = null
-    val issues = mutableListOf<Any>()
+  var i = 0
+  var after: String? = null
+  val issues = mutableListOf<Any>()
 
-    while (true) {
-        println("Getting page $i")
-        val query = """
+  while (true) {
+    println("Getting page $i")
+    val query = """
             query { 
               repository(name: "$repoName", owner: "$owner") {
                 issues(first: 100, after: $after) {
@@ -69,94 +69,147 @@ if (issuesFile.exists()) {
             }
         """.trimIndent()
 
-        val body = mapOf("query" to query, "variables" to emptyMap<String, String>()).let {
-            adapter.toJson(it)
-        }
-        println(body)
-        val response = body.toRequestBody("application/json".toMediaType()).let {
-            Request.Builder()
-                .url("https://api.github.com/graphql")
-                .header("Authorization", "bearer $token")
-                .post(it)
-                .build()
-        }.let {
-            okHttpClient.newCall(it).execute()
-        }
-
-        if (!response.isSuccessful || response.body == null) {
-            throw IOException("Cannot get issues after '$after' (${response.code}): ${response.body?.string()}")
-        }
-
-        val root = adapter.fromJson(response.body!!.string())
-
-        issues.addAll(root!!.getObject("data").getObject("repository").getObject("issues").getList("nodes"))
-        i++
-        if (root.getObject("data").getObject("repository").getObject("issues").getObject("pageInfo")
-                .getBoolean("hasNextPage")
-        ) {
-            after = root.getObject("data").getObject("repository").getObject("issues").getObject("pageInfo")
-                .getString("endCursor").let { "\"$it\"" }
-        } else {
-            break
-        }
+    val body = mapOf("query" to query, "variables" to emptyMap<String, String>()).let {
+      adapter.toJson(it)
+    }
+    println(body)
+    val response = body.toRequestBody("application/json".toMediaType()).let {
+      Request.Builder()
+          .url("https://api.github.com/graphql")
+          .header("Authorization", "bearer $token")
+          .post(it)
+          .build()
+    }.let {
+      okHttpClient.newCall(it).execute()
     }
 
-    issuesFile.writeText(adapter.toJson(issues))
+    if (!response.isSuccessful || response.body == null) {
+      throw IOException("Cannot get issues after '$after' (${response.code}): ${response.body?.string()}")
+    }
+
+    val root = adapter.fromJson(response.body!!.string())
+
+    issues.addAll(root!!.getObject("data")!!.getObject("repository")!!.getObject("issues")!!.getList("nodes")!!)
+    i++
+    if (root.getObject("data")!!.getObject("repository")!!.getObject("issues")!!.getObject("pageInfo")!!
+            .getBoolean("hasNextPage")!!
+    ) {
+      after = root.getObject("data")!!.getObject("repository")!!.getObject("issues")!!.getObject("pageInfo")!!
+          .getString("endCursor").let { "\"$it\"" }
+    } else {
+      break
+    }
+  }
+
+  issuesFile.writeText(adapter.toJson(issues))
 }
 
 val issues = adapter.fromJson(issuesFile.readText()) as List<Any>
 
-var opened = 0
-var closed = 0
-val responseTimes = mutableListOf<Long>()
 
-val dateFormat = SimpleDateFormat("yyyy-MM-dd HH:mm:ss")
+fun forEachIssue(from: String, to: String, block: (Any) -> Unit) {
+  val rangeStart = from.toDate().time
+  val rangeEnd = to.toDate().time
 
-val rangeStart = "2020-07-01T00:00:00Z".toDate().time
-val rangeEnd = "2020-12-31T23:59:59Z".toDate().time
-issues.forEach { issue ->
+  issues.forEach { issue ->
     val publishedAt = issue.getString("publishedAt")!!.toDate().time
     if (publishedAt in rangeStart..rangeEnd) {
-        opened++
-        val commentPublishedAt = issue.getObject("comments").getList("nodes").firstOrNull { comment ->
-            comment.getObject("author").getObject("login") == "martinbonnin"
-        }?.getString("publishedAt")
+      block(issue)
+    }
+  }
+}
 
-        if (commentPublishedAt != null && issue.getObject("author").getObject("login") != "martinbonnin") {
-            val responseTime = (commentPublishedAt.toDate().time - publishedAt) / 1000 / 3600
-            println(
-                String.format(
-                    "%4d, %8d, %s",
-                    (issue.getObject("number") as Number).toInt(),
-                    responseTime,
-                    issue.getObject("title")
-                )
+fun responseTime() {
+  var opened = 0
+  var closed = 0
+  val responseTimes = mutableListOf<Long>()
+
+  val rangeStart = "2020-07-01T00:00:00Z".toDate().time
+  val rangeEnd = "2020-12-31T23:59:59Z".toDate().time
+  issues.forEach { issue ->
+    val publishedAt = issue.getString("publishedAt")!!.toDate().time
+    if (publishedAt in rangeStart..rangeEnd) {
+      opened++
+      val commentPublishedAt = issue.getObject("comments")!!.getList("nodes")!!.firstOrNull { comment ->
+        comment.getObject("author")!!.getObject("login") == "martinbonnin"
+      }?.getString("publishedAt")
+
+      if (commentPublishedAt != null && issue.getObject("author")!!.getObject("login") != "martinbonnin") {
+        val responseTime = (commentPublishedAt.toDate().time - publishedAt) / 1000 / 3600
+        println(
+            String.format(
+                "%4d, %8d, %s",
+                (issue.getObject("number") as Number).toInt(),
+                responseTime,
+                issue.getObject("title")
             )
-            responseTimes.add(responseTime)
+        )
+        responseTimes.add(responseTime)
 
-        }
+      }
     }
     val closedAt = issue.getString("closedAt")?.toDate()?.time
     if (closedAt != null && closedAt in rangeStart..rangeEnd) {
-        closed++
+      closed++
     }
+  }
+
+  println("$opened issues opened")
+  println("$closed issues closed")
+
+  @OptIn(ExperimentalTime::class)
+  val avg = responseTimes.average()
+  println("${responseTimes.size} issues answered. Average response time: $avg")
+  println("${responseTimes.filter { it <= 1 }.size} issues answered in less than 2 hours")
 }
 
-println("$opened issues opened")
-println("$closed issues closed")
+fun mostIssuesOpened() {
+  val openers = mutableMapOf<String, Int>()
+  val commenters = mutableMapOf<String, Int>()
+  issues.forEach {
+    val author = it.getObject("author")?.getString("login")
+    if (author != null) {
+      val value = openers.get(author) ?: 0
+      openers.put(author, value + 1)
+    } else {
+      println("no opener for ${it.getString("title")}")
+    }
 
-@OptIn(ExperimentalTime::class)
-val avg = responseTimes.average()
-println("${responseTimes.size} issues answered. Average response time: $avg")
-println("${responseTimes.filter { it <= 1 }.size} issues answered in less than 2 hours")
+    it.getObject("comments")?.getList("nodes")?.forEach {
+      val commenter = it.getObject("author")?.getString("login")
+      if (commenter != null) {
+        val value = commenters.get(commenter) ?: 0
+        commenters.put(commenter, value + 1)
+      }
+    }
+  }
 
-fun String.toDate() = dateFormat.parse(
+
+  File("openers").writeText(buildString {
+    openers.entries.sortedByDescending { it.value }.forEach {
+      appendLine(String.format("%20s: %d", it.key, it.value))
+    }
+  })
+  File("commenters").writeText(buildString {
+    commenters.entries.sortedByDescending { it.value }.forEach {
+      appendLine(String.format("%20s: %d", it.key, it.value))
+    }
+  })
+
+  println("total issues processed: ${issues.size}.")
+  println("total openers: ${openers.values.sum()}.")
+  println("total different openers: ${openers.keys.size}.")
+}
+
+mostIssuesOpened()
+
+fun String.toDate() = SimpleDateFormat("yyyy-MM-dd HH:mm:ss").parse(
     this
         .replace("T", " ")
         .replace("Z", "")
 )
 
 fun Any.getString(key: String) = (this as Map<*, *>).get(key) as String?
-fun Any.getBoolean(key: String) = (this as Map<*, *>).get(key) as Boolean
-fun Any.getObject(key: String) = (this as Map<*, *>).get(key) as Any
-fun Any.getList(key: String) = (this as Map<*, *>).get(key) as List<Any>
+fun Any.getBoolean(key: String) = (this as Map<*, *>).get(key) as Boolean?
+fun Any.getObject(key: String) = (this as Map<*, *>).get(key) as Any?
+fun Any.getList(key: String) = (this as Map<*, *>).get(key) as List<Any>?

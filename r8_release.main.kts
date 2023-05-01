@@ -12,6 +12,7 @@
 
 import com.github.ajalt.clikt.core.CliktCommand
 import com.github.ajalt.clikt.parameters.options.flag
+import com.github.ajalt.clikt.parameters.options.help
 import com.github.ajalt.clikt.parameters.options.option
 import com.github.ajalt.clikt.parameters.options.required
 import eu.jrie.jetbrains.kotlinshell.processes.process.Process
@@ -32,11 +33,22 @@ check(File("tools/create_maven_release.py").exists()) {
   "r8_release.main.kts needs to be run from the r8 root"
 }
 
+listOf(
+    "GPG_PRIVATE_KEY",
+    "GPG_PRIVATE_KEY_PASSWORD",
+    "SONATYPE_NEXUS_USERNAME",
+    "SONATYPE_NEXUS_PASSWORD",
+    "NET_MBONNIN_PROFILE_ID"
+).forEach {
+  check(System.getenv(it) != null) { "$it is missing from env" }
+}
 //System.setProperty(org.slf4j.impl.SimpleLogger.DEFAULT_LOG_LEVEL_KEY, "TRACE");
 
 object : CliktCommand() {
-  val local by option(help = "Deploy to maven localt").flag()
-  val version by option().required()
+  val local by option(help = "Deploy to maven local").flag()
+  val version by option().help("The version to use in the published artifacts").required()
+  val versionToOverWrite by option().help("The version produced by the R8 scripts. If you're on a tag, this shouldn't be required")
+
 
   override fun run() {
     withFixedFile(".zip") { releaseFile ->
@@ -58,17 +70,17 @@ object : CliktCommand() {
       "unzip -d ${tmpDir.absolutePath} ${releaseFile.absolutePath}"().throwOnError()
     }
 
-    val versionToOverWrite = "3.1.9-dev"
+    val actualVersion = versionToOverWrite ?: version
     tmpDir.walk(direction = FileWalkDirection.BOTTOM_UP).forEach {
-      if (it.name.contains(versionToOverWrite)) {
-        val newName = it.name.replace(versionToOverWrite, version)
+      if (it.name.contains(actualVersion)) {
+        val newName = it.name.replace(actualVersion, version)
         it.renameTo(File(it.parentFile, newName))
       }
     }
     tmpDir.walk(direction = FileWalkDirection.BOTTOM_UP).forEach {
       if (it.extension == "pom") {
         it.writeText(it.readText()
-            .replace(versionToOverWrite, version)
+            .replace(actualVersion, version)
             .replace("<groupId>com.android.tools</groupId>", "<groupId>net.mbonnin.r8</groupId>")
         )
       }
