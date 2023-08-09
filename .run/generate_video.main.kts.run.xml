@@ -1,0 +1,12 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="generate_video.main.kts" type="KotlinStandaloneScriptRunConfigurationType">
+    <module name="kscripts" />
+    <option name="PROGRAM_PARAMETERS" value="-- generate --intro card.mp4 --sponsors sponsors.png --video date.mp4 --start-sec 0 --end-sec 1444 --out-dir out --video-id date" />
+    <shortenClasspath name="NONE" />
+    <option name="WORKING_DIRECTORY" value="$USER_HOME$/dev/am2023" />
+    <option name="filePath" value="$PROJECT_DIR$/../video-tools/kscripts/generate_video.main.kts" />
+    <method v="2">
+      <option name="Make" enabled="true" />
+    </method>
+  </configuration>
+</component>

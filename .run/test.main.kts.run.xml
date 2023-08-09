@@ -1,0 +1,11 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="test.main.kts" type="KotlinStandaloneScriptRunConfigurationType">
+    <module name="kscripts" />
+    <option name="PROGRAM_PARAMETERS" value="--version" />
+    <shortenClasspath name="NONE" />
+    <option name="filePath" value="$PROJECT_DIR$/test.main.kts" />
+    <method v="2">
+      <option name="Make" enabled="true" />
+    </method>
+  </configuration>
+</component>
