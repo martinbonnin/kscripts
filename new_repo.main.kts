@@ -1,5 +1,8 @@
 #!/usr/bin/env kotlin
 
+@file:DependsOn("org.jetbrains:annotations:24.0.0")
+
+import org.intellij.lang.annotations.Language
 import java.io.File
 
 check(args.size == 1) {
@@ -14,11 +17,26 @@ check (!root.exists()) {
 }
 root.mkdirs()
 
-root.resolve("build.gradle.kts").writeText("""
+@Language("kotlin")
+val buildContents = """
   plugins {
-    id("org.jetbrains.kotlin.jvm").version("1.9.0")
+    id("org.jetbrains.kotlin.multiplatform").version("1.9.20")
   }
-""".trimIndent())
+  
+  kotlin {
+    jvm()
+    
+    sourceSets {
+      getByName("jvmTest") {
+        dependencies {
+          implementation(kotlin("test"))
+        }
+      }
+    }
+  }
+""".trimIndent()
+
+root.resolve("build.gradle.kts").writeText(buildContents)
 
 root.resolve("settings.gradle.kts").writeText("""
   pluginManagement {
@@ -37,9 +55,17 @@ root.resolve(".gitignore").writeText("""
   build
 """.trimIndent())
 
-root.resolve("src/main/kotlin").apply {
+root.resolve("src/jvmTest/kotlin").apply {
     mkdirs()
-    resolve("Main.kt").createNewFile()
+    resolve("MainTest.kt").writeText("""
+        import kotlin.test.Test
+        
+        class MainTest {
+          @Test
+          fun testStuff() {
+          }
+        }
+    """.trimIndent())
 }
 
 ProcessBuilder()
