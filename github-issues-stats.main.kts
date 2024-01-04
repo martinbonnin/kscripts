@@ -12,15 +12,17 @@ import okhttp3.RequestBody.Companion.toRequestBody
 import okhttp3.logging.HttpLoggingInterceptor
 import java.io.File
 import java.io.IOException
-import java.lang.IllegalArgumentException
 import java.text.SimpleDateFormat
-import kotlin.time.Duration
 import kotlin.time.ExperimentalTime
-import kotlin.time.hours
 
+fun usage(): Nothing {
+  throw IllegalArgumentException("usage: github-issues-stats.main.kts [owner/repoName] [maintainer1,maintainer2,...]")
+}
 val token = System.getenv("GITHUB_TOKEN") ?: throw IllegalArgumentException("please set the GITHUB_TOKEN env variable")
 val (owner, repoName) = args.getOrNull(0)?.split("/")?.let { it[0] to it[1] }
-    ?: throw IllegalArgumentException("usage: github-issues-stats.main.kts [owner/repoName]")
+    ?: usage()
+
+val maintainers = args.getOrNull(1)?.split(",")?.toSet() ?: usage()
 
 val okHttpClient = OkHttpClient.Builder().addInterceptor(HttpLoggingInterceptor().apply {
   //level = HttpLoggingInterceptor.Level.BODY
@@ -106,7 +108,6 @@ if (issuesFile.exists()) {
 
 val issues = adapter.fromJson(issuesFile.readText()) as List<Any>
 
-
 fun forEachIssue(from: String, to: String, block: (Any) -> Unit) {
   val rangeStart = from.toDate().time
   val rangeEnd = to.toDate().time
@@ -124,17 +125,17 @@ fun responseTime() {
   var closed = 0
   val responseTimes = mutableListOf<Long>()
 
-  val rangeStart = "2020-07-01T00:00:00Z".toDate().time
-  val rangeEnd = "2020-12-31T23:59:59Z".toDate().time
+  val rangeStart = "2023-01-01T00:00:00Z".toDate().time
+  val rangeEnd = "2023-12-31T23:59:59Z".toDate().time
   issues.forEach { issue ->
     val publishedAt = issue.getString("publishedAt")!!.toDate().time
     if (publishedAt in rangeStart..rangeEnd) {
       opened++
       val commentPublishedAt = issue.getObject("comments")!!.getList("nodes")!!.firstOrNull { comment ->
-        comment.getObject("author")!!.getObject("login") == "martinbonnin"
+        maintainers.contains(comment.getObject("author")?.getObject("login"))
       }?.getString("publishedAt")
 
-      if (commentPublishedAt != null && issue.getObject("author")!!.getObject("login") != "martinbonnin") {
+      if (commentPublishedAt != null && !maintainers.contains(issue.getObject("author")?.getObject("login"))) {
         val responseTime = (commentPublishedAt.toDate().time - publishedAt) / 1000 / 3600
         println(
             String.format(
@@ -159,7 +160,7 @@ fun responseTime() {
 
   @OptIn(ExperimentalTime::class)
   val avg = responseTimes.average()
-  println("${responseTimes.size} issues answered. Average response time: $avg")
+  println("${responseTimes.size} issues answered. Average response time in hours: $avg")
   println("${responseTimes.filter { it <= 1 }.size} issues answered in less than 2 hours")
 }
 
@@ -201,8 +202,6 @@ fun mostIssuesOpened() {
   println("total different openers: ${openers.keys.size}.")
 }
 
-mostIssuesOpened()
-
 fun String.toDate() = SimpleDateFormat("yyyy-MM-dd HH:mm:ss").parse(
     this
         .replace("T", " ")
@@ -213,3 +212,5 @@ fun Any.getString(key: String) = (this as Map<*, *>).get(key) as String?
 fun Any.getBoolean(key: String) = (this as Map<*, *>).get(key) as Boolean?
 fun Any.getObject(key: String) = (this as Map<*, *>).get(key) as Any?
 fun Any.getList(key: String) = (this as Map<*, *>).get(key) as List<Any>?
+
+responseTime()

@@ -30,14 +30,15 @@ val password = System.getenv("MAILBOX_PASSWORD") ?: error("add MAILBOX_PASSWORD 
 
 val sslFactory = (SSLSocketFactory.getDefault() as SSLSocketFactory)
 
-val filterPath = args.getOrNull(0) ?: error("upload_filters.main.kts [FILTER_FILE]")
+val filterPath = "/Users/mbonnin/git/notes/email/sieve_filters" // args.getOrNull(0) ?: error("upload_filters.main.kts [FILTER_FILE]")
 val filterFile = File(filterPath)
 check (filterFile.isFile) {
   "$filterPath does not exist"
 }
 
-createImapFolders()
+//createImapFolders()
 setSieveFilter()
+
 
 fun createImapFolders() {
   val folders = filterFile.readLines()
@@ -89,7 +90,6 @@ fun setSieveFilter() {
       }
     }
   }
-
 }
 
 fun uploadFilters(source: BufferedSource, sink: BufferedSink, filterFile: File) {
@@ -109,7 +109,7 @@ fun uploadFilters(source: BufferedSource, sink: BufferedSink, filterFile: File) 
   val script = filterFile.readBytes()
 
   sink.sendCommand("PUTSCRIPT \"martin\" {${script.size}+}")
-  println(">sending script...")
+  println(">${script.decodeToString()}")
   sink.write(script).flush()
   sink.sendCommand("")
 
